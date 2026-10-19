@@ -1,6 +1,7 @@
 ﻿# tiaportal-mcp 설치/빌드 스크립트 (Windows PowerShell 5.1 이상)
 #
-# 레포 없이 이 파일만 받아서 실행해도 된다 (일반 PowerShell, 관리자 권한 불필요):
+# 레포 없이 이 파일만 받아서 실행해도 된다. 빌드 도구(git, .NET)가 없는 PC는 관리자 PowerShell에서
+# 실행해야 자동 설치된다 (아니면 설치 명령만 안내). 도구가 다 있으면 일반 PowerShell로 충분:
 #   powershell -ExecutionPolicy Bypass -File .\install-tiaportal-mcp.ps1
 # 한 줄로 받아서 실행:
 #   powershell -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/p-7347/tiaportal-mcp/rebase/upstream-base/install/install-tiaportal-mcp.ps1 -OutFile $env:TEMP\install-tiaportal-mcp.ps1; & $env:TEMP\install-tiaportal-mcp.ps1"
@@ -48,17 +49,35 @@ function Run([string]$exe, [string[]]$arguments) {
 }
 
 # winget 설치 직후에도 이 창에서 새 명령이 보이도록 PATH를 레지스트리에서 다시 읽는다.
+# 설치 프로그램이 PATH를 늦게 고치거나 사용자 범위로 설치해도 찾도록, 기본 설치 폴더도 붙인다.
 function Refresh-Path {
     $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $user = [Environment]::GetEnvironmentVariable("Path", "User")
-    $env:Path = "$machine;$user"
+    $known = @(
+        "$env:ProgramFiles\Git\cmd",
+        "$env:LOCALAPPDATA\Programs\Git\cmd",
+        "$env:ProgramFiles\dotnet",
+        "$env:LOCALAPPDATA\Microsoft\dotnet"
+    ) | Where-Object { Test-Path $_ }
+    $env:Path = (@($machine, $user) + $known) -join ";"
 }
 
+Refresh-Path
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$manualInstalls = @()
 $hasWinget = [bool](Get-Command winget -ErrorAction SilentlyContinue)
 
 # 후보 winget ID를 차례로 설치해 보고, 설치 뒤 $check 가 참이면 성공.
 function Install-Tool([string]$name, [string[]]$wingetIds, [scriptblock]$check, [string]$manualUrl) {
     if (& $check) { Ok $name; return $true }
+
+    # 관리자 권한 없이 실행하면 winget이 UAC 창을 띄워야 하는데, AI 도구 안이나 원격 셸처럼
+    # 화면 없는 창에서는 그 창이 뜨지 않고 설치가 조용히 실패한다. 그래서 시도하지 않고 명령을 안내한다.
+    if (-not $isAdmin -and -not $NoInstall -and $hasWinget) {
+        Warn "$name 이(가) 없습니다. 관리자 권한이 아니라 자동 설치는 건너뜁니다."
+        $script:manualInstalls += "winget install --id $($wingetIds[0]) -e --source winget --accept-package-agreements --accept-source-agreements"
+        return $false
+    }
 
     if ($NoInstall -or -not $hasWinget) {
         $why = if ($NoInstall) { "-NoInstall" } else { "winget 없음" }
@@ -68,12 +87,16 @@ function Install-Tool([string]$name, [string[]]$wingetIds, [scriptblock]$check, 
 
     foreach ($id in $wingetIds) {
         Write-Host "  ..  $name 설치 중 (winget $id). 관리자 확인 창이 뜨면 '예'를 누르세요."
-        & winget install --id $id -e --silent --accept-package-agreements --accept-source-agreements | Out-Host
+        # '--source winget': 회사 PC에서 msstore 원본의 약관/인증서 문제로 설치 전체가 멈추는 일을 피한다.
+        & winget install --id $id -e --source winget --silent --accept-package-agreements --accept-source-agreements | Out-Host
+        $code = $LASTEXITCODE
         Refresh-Path
         if (& $check) { Ok "$name (방금 설치)"; return $true }
+        Warn "winget $id 결과: exit $code"
     }
 
     Warn "$name 자동 설치에 실패했습니다. 직접 설치: $manualUrl"
+    Warn "또는 PowerShell에서:  winget install --id $($wingetIds[0]) -e --source winget"
     return $false
 }
 
@@ -92,6 +115,12 @@ $okSdk = Install-Tool ".NET SDK 8 이상" @("Microsoft.DotNet.SDK.8") {
 $okRef = Install-Tool ".NET Framework 4.8 Developer Pack" @("Microsoft.DotNet.Framework.DeveloperPack_4", "Microsoft.DotNet.Framework.DeveloperPack.4.8") {
     Test-Path $refAsm
 } "https://dotnet.microsoft.com/download/dotnet-framework/thank-you/net48-developer-pack-offline-installer"
+
+if ($manualInstalls.Count -gt 0) {
+    Warn "Windows 시작 메뉴에서 PowerShell을 '관리자 권한으로 실행'으로 열고 아래 줄을 붙여넣으세요:"
+    $manualInstalls | ForEach-Object { Write-Host "      $_" }
+    Warn "또는 이 스크립트 자체를 관리자 PowerShell에서 실행하면 자동으로 설치합니다."
+}
 
 if (-not ($okGit -and $okSdk -and $okRef)) {
     Fail "빌드 도구가 모자랍니다. 위 안내대로 설치한 뒤 PowerShell을 새로 열고 이 스크립트를 다시 실행하세요."

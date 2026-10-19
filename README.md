@@ -217,8 +217,11 @@ The server instructions carry the same routine in short form.
 
 ### Install with the script
 
-`install/install-tiaportal-mcp.ps1` does all of the above on a fresh PC. Download and run it in a normal
-PowerShell (no admin needed; Windows asks for confirmation when a tool or the group change needs it):
+`install/install-tiaportal-mcp.ps1` does all of the above on a fresh PC. On a PC without git or the .NET
+SDK, run it in a PowerShell opened with "Run as administrator": run without admin rights, it does not
+try to install them (the Windows confirmation does not appear inside AI tools or remote shells, so
+the install failed silently) and prints the `winget` lines to paste into an admin PowerShell instead.
+With the tools present, a normal PowerShell is enough:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -Command "iwr https://raw.githubusercontent.com/p-7347/tiaportal-mcp/rebase/upstream-base/install/install-tiaportal-mcp.ps1 -OutFile $env:TEMP\install-tiaportal-mcp.ps1; & $env:TEMP\install-tiaportal-mcp.ps1"
