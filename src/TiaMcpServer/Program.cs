@@ -180,8 +180,8 @@ namespace TiaMcpServer
                             "whole block's XML, do not compile the whole PLC again and again, do not repeat a failing call " +
                             "unchanged, and do not work around this server with scripts or file edits. If the same step fails " +
                             "twice, stop and show the user the full error text. The 'ModifyBlockWorkflow' prompt spells out the " +
-                            "routine. Changes stay in memory until 'SaveProject'; save only when the user asks. If 'Connect' says this " +
-                            "server build is old, pass that on to the user once; it does not stop anything. " +
+                            "routine. Changes stay in memory until 'SaveProject'; save only when the user asks. If this text or " +
+                            "'Connect' says the server build is old, pass that on to the user once; it does not stop anything. " +
                             "(4) Paths: 'softwarePath' is the PLC software name from 'GetProjectTree', e.g. 'PLC_1'. Block, " +
                             "type and group paths are '/'-separated and relative to their system folder ('Program blocks', " +
                             "'PLC data types', 'PLC tags'), e.g. '009_Servo/zGDBs/SM_UserData_Origin'; an empty groupPath means " +
@@ -193,6 +193,7 @@ namespace TiaMcpServer
                                 ? " The server presets " + string.Join(", ", ToolDefaults.Presets.Keys.OrderBy(k => k, StringComparer.Ordinal)) +
                                   ": leave them out of a call to use the preset, pass a value to override it. 'GetState' shows the presets."
                                 : string.Empty) +
+                            (VersionInfo.StaleBuildHint() is { } stale ? " " + stale : string.Empty) +
                             (WritePolicy.AllowWrite
                                 ? " Write mode is enabled: tools that create, rename or delete project objects are " +
                                   "available. Their changes stay in memory until 'SaveProject' (or 'SaveSession')."
