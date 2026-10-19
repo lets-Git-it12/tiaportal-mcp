@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace TiaMcpServer.Siemens
 {
@@ -389,14 +388,17 @@ namespace TiaMcpServer.Siemens
                             $"'triggerTags' go with triggerType 'Tags', not '{type.Value}'.");
                     }
 
-                    if (!string.IsNullOrEmpty(triggerCycle) && type != TriggerType.CustomCycle)
+                    var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
+                    var existing = RequireReplaceable(item, propertyName, DynamizationType.Script);
+
+                    // Without 'triggerType' the current trigger stays, so a new cycle alone is fine on a
+                    // script that already runs on a custom cycle.
+                    var effectiveType = type ?? (existing as ScriptDynamization)?.Trigger?.Type;
+                    if (!string.IsNullOrEmpty(triggerCycle) && effectiveType != TriggerType.CustomCycle)
                     {
                         throw new PortalException(PortalErrorCode.InvalidParams,
                             "'triggerCycle' goes with triggerType 'CustomCycle'.");
                     }
-
-                    var item = RequireHmiScreenItem(softwarePath, screenName, itemName);
-                    var existing = RequireReplaceable(item, propertyName, DynamizationType.Script);
 
                     var result = Prepare(item, propertyName, existing, nameof(SetHmiScriptDynamization), screenName);
 
