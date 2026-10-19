@@ -92,6 +92,43 @@ namespace TiaMcpServer
             return result;
         }
 
+        /// <summary>Days after which 'Connect' mentions that the running build may be outdated.</summary>
+        public const int StaleBuildDays = 7;
+
+        /// <summary>
+        /// A one-sentence nudge to update when this exe was built more than StaleBuildDays ago,
+        /// otherwise null. Uses the exe's file time: no git or network call, so it is free to run on
+        /// every 'Connect'. People rarely update on their own, and bug reports against old builds
+        /// waste everybody's time; this only informs, it never blocks.
+        /// </summary>
+        public static string? StaleBuildHint()
+        {
+            try
+            {
+                var exe = typeof(VersionInfo).Assembly.Location;
+                if (string.IsNullOrEmpty(exe) || !File.Exists(exe))
+                {
+                    return null;
+                }
+
+                var built = File.GetLastWriteTime(exe);
+                var days = (int)(DateTime.Now - built).TotalDays;
+                if (days < StaleBuildDays)
+                {
+                    return null;
+                }
+
+                var commit = BuildInfo.GitCommit.Length >= 7 ? BuildInfo.GitCommit.Substring(0, 7) : BuildInfo.GitCommit;
+                return $"This server build is {days} days old (built {built:yyyy-MM-dd}, commit {commit}); newer versions with fixes may exist. " +
+                       "Tell the user once that they can update by closing this MCP client and running install\\install-tiaportal-mcp.ps1 again " +
+                       "(or 'git pull' and rebuild), then carry on with the task.";
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static string? FindRepoRoot()
         {
             var dir = new DirectoryInfo(AppContext.BaseDirectory);

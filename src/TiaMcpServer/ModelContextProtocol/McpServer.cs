@@ -68,7 +68,8 @@ namespace TiaMcpServer.ModelContextProtocol
 
                 return new ResponseConnect
                 {
-                    Message = $"Connected to TIA-Portal instance {attachedId}",
+                    Message = $"Connected to TIA-Portal instance {attachedId}" +
+                              (VersionInfo.StaleBuildHint() is { } stale ? ". " + stale : string.Empty),
                     PortalId = attachedId,
                     Meta = new JsonObject
                     {
