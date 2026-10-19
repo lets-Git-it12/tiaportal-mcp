@@ -2179,6 +2179,92 @@ Use the BindHmiTag tool with these parameters:
 - tagName: {tagName}";
         }
 
+        [McpServerPrompt(Name = "GetHmiDynamizations"), Description("Show what drives the properties of WinCC Unified screen items")]
+        public static string GetHmiDynamizations(string softwarePath, string screenName, string regexName = "", string propertyName = "")
+        {
+            return $@"List the dynamizations of the items on a WinCC Unified screen in full: tag with mapping table or formula, script with trigger, flashing, resource list. Reads only.
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- screenName: name of the screen, as GetHmiScreens lists it
+- regexName: optional filter on the item names
+- propertyName: optional property, e.g. 'BackColor'
+
+Use the GetHmiDynamizations tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}{OptionalParameter("regexName", regexName)}{OptionalParameter("propertyName", propertyName)}";
+        }
+
+        [McpServerPrompt(Name = "SetHmiTagDynamization"), Description("Make a screen item property follow an HMI tag through a value mapping")]
+        public static string SetHmiTagDynamization(string softwarePath, string screenName, string itemName, string propertyName, string tagName, string mapping = "", string formula = "")
+        {
+            return $@"Bind an HMI tag to a property of a WinCC Unified screen item and set how tag values map to property values (requires the server started with '--allow-write').
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- propertyName: e.g. 'BackColor' or 'Visible'
+- mapping: JSON array of range entries, e.g. [{{""from"":0,""to"":0,""value"":""#00FF00""}},{{""from"":1,""to"":1,""value"":""#FF0000""}}]
+
+Use the SetHmiTagDynamization tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}
+- propertyName: {propertyName}
+- tagName: {tagName}{OptionalParameter("mapping", mapping)}{OptionalParameter("formula", formula)}";
+        }
+
+        [McpServerPrompt(Name = "SetHmiScriptDynamization"), Description("Compute a screen item property with a script")]
+        public static string SetHmiScriptDynamization(string softwarePath, string screenName, string itemName, string propertyName, string scriptCode, string triggerType = "", string triggerTags = "", string triggerCycle = "", string globalDefinitionCode = "")
+        {
+            return $@"Create or change the script dynamization of a WinCC Unified screen item property (requires the server started with '--allow-write').
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- triggerType: Disabled, T100ms ... T10s, CustomCycle, Tags or AutomaticTags
+- triggerTags: comma separated HMI tags for triggerType 'Tags'
+
+Use the SetHmiScriptDynamization tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}
+- propertyName: {propertyName}
+- scriptCode: {scriptCode}{OptionalParameter("triggerType", triggerType)}{OptionalParameter("triggerTags", triggerTags)}{OptionalParameter("triggerCycle", triggerCycle)}{OptionalParameter("globalDefinitionCode", globalDefinitionCode)}";
+        }
+
+        [McpServerPrompt(Name = "SetHmiFlashingDynamization"), Description("Make a screen item color flash")]
+        public static string SetHmiFlashingDynamization(string softwarePath, string screenName, string itemName, string propertyName, string flashingCondition = "", string flashingRate = "", string color = "", string alternateColor = "")
+        {
+            return $@"Create or change the flashing of a color property of a WinCC Unified screen item (requires the server started with '--allow-write').
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- flashingCondition: Never, Always or RangeViolation
+- flashingRate: Slow, Medium or Fast
+- color, alternateColor: '#RRGGBB'
+
+Use the SetHmiFlashingDynamization tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}
+- propertyName: {propertyName}{OptionalParameter("flashingCondition", flashingCondition)}{OptionalParameter("flashingRate", flashingRate)}{OptionalParameter("color", color)}{OptionalParameter("alternateColor", alternateColor)}";
+        }
+
+        [McpServerPrompt(Name = "DeleteHmiDynamization"), Description("Remove the dynamization of a screen item property")]
+        public static string DeleteHmiDynamization(string softwarePath, string screenName, string itemName, string propertyName)
+        {
+            return $@"Remove the dynamization of one property of a WinCC Unified screen item; it is backed up as JSON first (requires the server started with '--allow-write').
+
+Common parameter values:
+- softwarePath: path of the WinCC Unified HMI software, e.g. 'HMI_1/HMI_RT_1'
+- propertyName: the dynamized property, as GetHmiDynamizations lists it
+
+Use the DeleteHmiDynamization tool with these parameters:
+- softwarePath: {softwarePath}
+- screenName: {screenName}
+- itemName: {itemName}
+- propertyName: {propertyName}";
+        }
+
         [McpServerPrompt(Name = "CreateHmiFaceplate"), Description("Place a faceplate on a WinCC Unified screen")]
         public static string CreateHmiFaceplate(string softwarePath, string screenName, string name, string faceplateType, string left = "", string top = "", string width = "", string height = "")
         {

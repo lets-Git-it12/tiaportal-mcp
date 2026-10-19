@@ -20,6 +20,10 @@ namespace TiaMcpServer.Siemens
         // (the per-call transaction only helps until then). The default root is
         // %TEMP%\tiaportal-mcp-backups; '--backup-path' changes it.
         //
+        // WinCC Unified screens cannot be exported in this Openness version, so the HMI dynamization
+        // writes (Portal.HmiDynamization.cs) store the dynamization they change as a .json file in the
+        // same place instead.
+        //
         // A backup that cannot be written (e.g. TIA does not export inconsistent blocks) does not
         // stop the change: the caller gets a warning instead, so it can decide to compile first.
 
@@ -120,7 +124,7 @@ namespace TiaMcpServer.Siemens
                 ("softwarePath", softwarePath), ("importPath", importPath));
         }
 
-        private static BackupResult WriteBackup(string toolName, string objectPath, bool consistent, Action<FileInfo> export)
+        private static BackupResult WriteBackup(string toolName, string objectPath, bool consistent, Action<FileInfo> export, string extension = "xml")
         {
             if (!consistent)
             {
@@ -137,7 +141,7 @@ namespace TiaMcpServer.Siemens
                 Directory.CreateDirectory(directory);
 
                 var file = System.IO.Path.Combine(directory,
-                    $"{now:HHmmss_fff}_{toolName}_{FileNames.Safe(objectPath.Replace('/', '_'))}.xml");
+                    $"{now:HHmmss_fff}_{toolName}_{FileNames.Safe(objectPath.Replace('/', '_'))}.{extension}");
 
                 export(new FileInfo(file));
 

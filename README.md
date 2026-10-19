@@ -105,10 +105,13 @@ object of the same name, the current object is exported as XML to
 `<backup path>\<yyyyMMdd>\<time>_<tool>_<object>.xml` and the reply names the file (`backup`).
 Re-importing that file restores the old version even after the project was saved. An object TIA
 will not export (inconsistent) is changed anyway and the reply says why there is no backup.
+WinCC Unified screens cannot be exported, so `SetHmiTagDynamization`, `SetHmiScriptDynamization`,
+`SetHmiFlashingDynamization` and `DeleteHmiDynamization` save the dynamization they change as a
+`.json` file in the same folder instead (and return it as `previous`).
 
 ## Tools
 
-165 tools total. Read-only/ungated tools (94) are always available.
+170 tools total. Read-only/ungated tools (95) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -130,10 +133,10 @@ will not export (inconsistent) is changed anyway and the reply says why there is
 | Cross references              | `GetCrossReferences`                                                                                                                                                                                   |
 | Block documents (V20+)        | `ExportAsDocuments`, `ExportBlocksAsDocuments`                                                                                                                                                         |
 | Type documents (V21+)         | `ExportTypeAsDocuments`, `ExportTypesAsDocuments`                                                                                                                                                      |
-| HMI, WinCC Unified (read)     | `GetHmiTagTables`, `GetHmiTags`, `GetHmiScreens`, `GetHmiScreenItems`, `GetHmiDiscreteAlarms`, `GetHmiAnalogAlarms`, `GetHmiTextLists`, `CompareHmiScreens`                                                                 |
+| HMI, WinCC Unified (read)     | `GetHmiTagTables`, `GetHmiTags`, `GetHmiScreens`, `GetHmiScreenItems`, `GetHmiDynamizations`, `GetHmiDiscreteAlarms`, `GetHmiAnalogAlarms`, `GetHmiTextLists`, `CompareHmiScreens`                                          |
 | Understand and read (comfort) | `GetPlcSummary`, `ResolveObjectPath`, `WhereUsed`, `FindInCode`, `GetBlockSource`, `GetNetworkSource`, `GetTypeSource`, `PreviewImport`, `OpenTiaProject`, `ExportPlcAsDocuments`, `CompareExports`, `SearchExports`    |
 
-Write tools (71) require `--allow-write` (see [Write mode](#write-mode) for the handful that
+Write tools (75) require `--allow-write` (see [Write mode](#write-mode) for the handful that
 don't, and why).
 
 | Area                       | Tools                                                                                                                                                                                          |
@@ -150,7 +153,7 @@ don't, and why).
 | Type documents (V21+)      | `ImportTypeFromDocuments`, `ImportTypesFromDocuments`                                                                                                                                           |
 | Devices and network        | `CreateDevice`, `CreateDeviceWithItem`, `DeleteDevice`, `CreateDeviceGroup`, `DeleteDeviceGroup`, `SetIpAddress`, `ConnectToSubnet`, `DisconnectFromSubnet`                                      |
 | CAx (AutomationML)         | `ImportCax`                                                                                                                                                                                     |
-| HMI, WinCC Unified (write) | `CreateHmiScreen`, `DeleteHmiScreen`, `CreateHmiScreenItem`, `UpdateHmiScreenItem`, `DeleteHmiScreenItem`, `BindHmiTag`, `CreateHmiFaceplate`, `SetHmiFaceplateInterface`, `CopyHmiScreen`, `CopyHmiScreens`, `CreateHmiTag`        |
+| HMI, WinCC Unified (write) | `CreateHmiScreen`, `DeleteHmiScreen`, `CreateHmiScreenItem`, `UpdateHmiScreenItem`, `DeleteHmiScreenItem`, `BindHmiTag`, `SetHmiTagDynamization`, `SetHmiScriptDynamization`, `SetHmiFlashingDynamization`, `DeleteHmiDynamization`, `CreateHmiFaceplate`, `SetHmiFaceplateInterface`, `CopyHmiScreen`, `CopyHmiScreens`, `CreateHmiTag` |
 
 `GetSoftwareTree` accepts a `sections` argument - any comma separated subset of
 `blocks,types,tags,watch,sources`, default `all` - to keep the output small on a large PLC.
@@ -375,8 +378,8 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 145 of the 165 tools publish an `outputSchema` and return `structuredContent` (79 of 94
-  read-only, 66 of 71 write).
+- 150 of the 170 tools publish an `outputSchema` and return `structuredContent` (80 of 95
+  read-only, 70 of 75 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
 - Independently of that, `GetState` can report the progress of another call still running on the
   same TIA Portal instance (tool name, processed/total, current object, time since last progress)
