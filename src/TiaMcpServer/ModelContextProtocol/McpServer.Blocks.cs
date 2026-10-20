@@ -612,7 +612,8 @@ namespace TiaMcpServer.ModelContextProtocol
             [Description("networkFile: for replace/insert, absolute path of an XML file holding the network (<SW.Blocks.CompileUnit>), e.g. a block export")] string networkFile = "",
             [Description("sourceNetworkIndex: which network of networkFile to take, 0-based (default 0)")] int sourceNetworkIndex = 0,
             [Description("previewFile: optional absolute path; the edited block XML is written there and nothing is imported")] string previewFile = "",
-            [Description("sclFile: for replace/insert, instead of networkFile: absolute path of a text file with the SCL statements of the new network ('#' names refer to this block's interface). TIA compiles it in a scratch FB that is deleted again, also in preview")] string sclFile = "")
+            [Description("sclFile: for replace/insert, instead of networkFile: absolute path of a text file with the SCL statements of the new network ('#' names refer to this block's interface). TIA compiles it in a scratch FB that is deleted again, also in preview")] string sclFile = "",
+            [Description("title: optional network title for replace/insert, e.g. 'Vision : 2D Result Check'. Empty (default) keeps the replaced network's title and comment when the new network has none (an SCL network never has)")] string title = "")
         {
             WritePolicy.EnsureEnabled(nameof(EditBlockNetwork));
 
@@ -633,7 +634,7 @@ namespace TiaMcpServer.ModelContextProtocol
                     Operation.RequireAbsolutePath(sclFile, nameof(sclFile));
                 }
 
-                var result = Portal.EditBlockNetwork(softwarePath, blockPath, action, networkIndex, networkFile, sourceNetworkIndex, previewFile, sclFile);
+                var result = Portal.EditBlockNetwork(softwarePath, blockPath, action, networkIndex, networkFile, sourceNetworkIndex, previewFile, sclFile, title);
                 var verb = action.Trim().ToLowerInvariant() switch
                 {
                     "delete" => "deleted",
@@ -653,6 +654,15 @@ namespace TiaMcpServer.ModelContextProtocol
                 if (result.SclCompiled)
                 {
                     message += " The SCL text compiled in a scratch FB, which was deleted again.";
+                }
+
+                if (result.TitleSet)
+                {
+                    message += $" Network title set to '{title}'.";
+                }
+                else if (result.TextsKept.Count > 0)
+                {
+                    message += $" Kept the replaced network's {string.Join(" and ", result.TextsKept.Select(t => t.ToLowerInvariant()))}.";
                 }
 
                 var backup = new Portal.BackupResult { Path = result.Backup, Warning = result.BackupWarning };

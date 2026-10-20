@@ -35,6 +35,10 @@ namespace TiaMcpServer.Siemens
         //   interface and the text as its body is generated from a source, compiled, exported,
         //   and deleted again; its network is what gets inserted (the manual trick used for the
         //   Vision_2D Cell ID network, 2026-10-16).
+        // - Title and comment. A replaced network keeps its title and comment when the new one
+        //   brings none; an SCL network always arrives without them (the scratch FB has none), which
+        //   dropped "Vision : 2D Result Check" from a replaced network (2026-10-20). 'title' sets
+        //   the title of a replaced or inserted network explicitly.
 
         public sealed class NetworkEditResult
         {
@@ -46,6 +50,11 @@ namespace TiaMcpServer.Siemens
             public string? BackupWarning { get; set; }
             public string? PreviewFile { get; set; }
             public bool SclCompiled { get; set; }
+
+            /// <summary>"Title" and/or "Comment" when they were taken over from the replaced network.</summary>
+            public List<string> TextsKept { get; } = new List<string>();
+
+            public bool TitleSet { get; set; }
         }
 
         /// <param name="action">"replace", "insert" (before networkIndex; the network count appends) or "delete".</param>
@@ -53,8 +62,9 @@ namespace TiaMcpServer.Siemens
         /// <param name="sourceNetworkIndex">Which network of networkFile to take (0-based, default 0).</param>
         /// <param name="previewFile">When set, the edited block XML is written there and nothing is imported.</param>
         /// <param name="sclFile">For replace/insert, instead of networkFile: a text file with the SCL statements of the new network.</param>
+        /// <param name="title">For replace/insert: the network title; empty keeps the replaced network's title (or the new network's own).</param>
         public NetworkEditResult EditBlockNetwork(string softwarePath, string blockPath, string action, int networkIndex,
-            string networkFile, int sourceNetworkIndex, string previewFile, string sclFile = "")
+            string networkFile, int sourceNetworkIndex, string previewFile, string sclFile = "", string title = "")
         {
             return Operation.Run(_logger, nameof(EditBlockNetwork), PortalErrorCode.ImportFailed,
                 () =>
@@ -136,6 +146,7 @@ namespace TiaMcpServer.Siemens
                             break;
 
                         case "replace":
+                            result.TextsKept.AddRange(KeepNetworkTexts(units[networkIndex], incoming!));
                             units[networkIndex].ReplaceWith(incoming!);
                             break;
 
@@ -155,6 +166,12 @@ namespace TiaMcpServer.Siemens
                             }
 
                             break;
+                    }
+
+                    if (incoming != null && !string.IsNullOrWhiteSpace(title))
+                    {
+                        SetNetworkTitle(incoming, title);
+                        result.TitleSet = true;
                     }
 
                     if (incoming != null)
@@ -380,6 +397,88 @@ namespace TiaMcpServer.Siemens
         }
 
         /// <summary>Renumbers every ID attribute in document order (hex, from 0), as TIA's own exports do.</summary>
+        /// <summary>The network's Title or Comment (MultilingualText), if it has one.</summary>
+        private static XElement? NetworkText(XElement unit, string composition) =>
+            unit.Elements().FirstOrDefault(e => e.Name.LocalName == "ObjectList")?
+                .Elements().FirstOrDefault(e => e.Name.LocalName == "MultilingualText" && (string?)e.Attribute("CompositionName") == composition);
+
+        private static bool HasText(XElement? text) =>
+            text != null && text.Descendants().Any(e => e.Name.LocalName == "Text" && !string.IsNullOrWhiteSpace(e.Value));
+
+        /// <summary>
+        /// Copies the replaced network's title and comment onto the new network where the new one
+        /// has none. Returns which were copied.
+        /// </summary>
+        private static IEnumerable<string> KeepNetworkTexts(XElement original, XElement incoming)
+        {
+            var kept = new List<string>();
+
+            foreach (var composition in new[] { "Title", "Comment" })
+            {
+                var old = NetworkText(original, composition);
+                var now = NetworkText(incoming, composition);
+                if (!HasText(old) || HasText(now))
+                {
+                    continue;
+                }
+
+                var copy = new XElement(old!);
+                if (now != null)
+                {
+                    now.ReplaceWith(copy);
+                }
+                else
+                {
+                    ObjectListOf(incoming).Add(copy);
+                }
+
+                kept.Add(composition);
+            }
+
+            return kept;
+        }
+
+        /// <summary>
+        /// Sets the network title in every language the title has. A network without a title
+        /// element gets one shaped like its comment (same languages).
+        /// </summary>
+        private static void SetNetworkTitle(XElement unit, string title)
+        {
+            var text = NetworkText(unit, "Title");
+            if (text == null)
+            {
+                var comment = NetworkText(unit, "Comment")
+                    ?? throw new PortalException(PortalErrorCode.InvalidParams, "The new network has neither a title nor a comment element to take the title from.");
+
+                text = new XElement(comment);
+                text.SetAttributeValue("CompositionName", "Title");
+                comment.AddAfterSelf(text);
+            }
+
+            var items = text.Descendants().Where(e => e.Name.LocalName == "Text").ToList();
+            if (items.Count == 0)
+            {
+                throw new PortalException(PortalErrorCode.InvalidParams, "The network title has no language entries to write the title into.");
+            }
+
+            foreach (var item in items)
+            {
+                item.Value = title;
+            }
+        }
+
+        private static XElement ObjectListOf(XElement unit)
+        {
+            var list = unit.Elements().FirstOrDefault(e => e.Name.LocalName == "ObjectList");
+            if (list == null)
+            {
+                list = new XElement(unit.Name.Namespace + "ObjectList");
+                unit.Add(list);
+            }
+
+            return list;
+        }
+
         private static void RenumberIds(XDocument doc)
         {
             var next = 0;
