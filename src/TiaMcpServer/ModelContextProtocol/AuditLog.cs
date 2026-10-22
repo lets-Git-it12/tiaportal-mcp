@@ -56,11 +56,14 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
             };
 
+        /// <summary>The 'message' field of the structured reply, else the reply text.</summary>
         private static string? MessageOf(CallToolResult result) =>
-            result.Content?.OfType<TextContentBlock>().Select(t => t.Text).FirstOrDefault();
+            FieldOf(result, "message") ?? result.Content?.OfType<TextContentBlock>().Select(t => t.Text).FirstOrDefault();
 
         /// <summary>The 'backup' field of the structured reply, when the tool has one.</summary>
-        private static string? BackupOf(CallToolResult result)
+        private static string? BackupOf(CallToolResult result) => FieldOf(result, "backup");
+
+        private static string? FieldOf(CallToolResult result, string field)
         {
             try
             {
@@ -71,9 +74,9 @@ namespace TiaMcpServer.ModelContextProtocol
 
                 var element = JsonSerializer.SerializeToElement(result.StructuredContent);
                 return element.ValueKind == JsonValueKind.Object
-                       && element.TryGetProperty("backup", out var backup)
-                       && backup.ValueKind == JsonValueKind.String
-                    ? backup.GetString()
+                       && element.TryGetProperty(field, out var value)
+                       && value.ValueKind == JsonValueKind.String
+                    ? value.GetString()
                     : null;
             }
             catch

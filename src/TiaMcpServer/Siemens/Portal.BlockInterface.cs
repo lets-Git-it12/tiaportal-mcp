@@ -90,6 +90,15 @@ namespace TiaMcpServer.Siemens
                             $"'{block.Name}' is an instance DB; its interface comes from its FB. Change the FB's interface and compile it ('CompileCodeBlock').");
                     }
 
+                    // TIA keeps no start values for temporary data, nor for an FC's parameters; checked before the
+                    // consistency check so a wrong argument is reported without a compile first.
+                    if (!string.IsNullOrEmpty(startValue) && (sectionName == "Temp" || sectionName == "Return"
+                        || (block is FC && (sectionName == "Input" || sectionName == "Output" || sectionName == "InOut"))))
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            $"A {sectionName} member of {(block is FC ? "an FC" : "this block")} has no start value; leave 'startValue' empty.");
+                    }
+
                     if (!block.IsConsistent)
                     {
                         throw new PortalException(PortalErrorCode.InvalidState,
@@ -102,14 +111,6 @@ namespace TiaMcpServer.Siemens
                     }
 
                     EnsureNotKnowHowProtected(block);
-
-                    // TIA keeps no start values for temporary data, nor for an FC's parameters.
-                    if (!string.IsNullOrEmpty(startValue) && (sectionName == "Temp" || sectionName == "Return"
-                        || (block is FC && (sectionName == "Input" || sectionName == "Output" || sectionName == "InOut"))))
-                    {
-                        throw new PortalException(PortalErrorCode.InvalidParams,
-                            $"A {sectionName} member of {(block is FC ? "an FC" : "this block")} has no start value; leave 'startValue' empty.");
-                    }
 
                     var result = new InterfaceEditResult { BlockPath = GetBlockPath(block), Section = sectionName, MemberPath = memberPath.Trim() };
 
