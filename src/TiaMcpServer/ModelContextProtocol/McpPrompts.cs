@@ -903,6 +903,26 @@ Use the EditBlockNetwork tool with these parameters:
 - networkIndex: {networkIndex}{OptionalParameter("networkFile", networkFile)}{OptionalParameter("sourceNetworkIndex", sourceNetworkIndex)}{OptionalParameter("previewFile", previewFile)}{OptionalParameter("sclFile", sclFile)}{OptionalParameter("title", title)}";
         }
 
+        [McpServerPrompt(Name = "EditBlockInterface"), Description("Add, change or delete one member of a block interface")]
+        public static string EditBlockInterface(string softwarePath, string blockPath, string action, string section, string memberPath, string dataType = "", string startValue = "", string comment = "", string afterMember = "", string previewFile = "")
+        {
+            return $@"Change one variable in the interface of a program block (FB, FC, OB or global DB) without editing the whole block XML. The block is backed up first. Compile the block afterwards.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- blockPath: root-relative path of the block
+- action: 'add', 'update' or 'delete'
+- section: Input, Output, InOut, Static, Temp or Constant
+- memberPath: '.'-separated into Structs, e.g. 'aux.bNew'
+
+Use the EditBlockInterface tool with these parameters:
+- softwarePath: {softwarePath}
+- blockPath: {blockPath}
+- action: {action}
+- section: {section}
+- memberPath: {memberPath}{OptionalParameter("dataType", dataType)}{OptionalParameter("startValue", startValue)}{OptionalParameter("comment", comment)}{OptionalParameter("afterMember", afterMember)}{OptionalParameter("previewFile", previewFile)}";
+        }
+
         // Not a tool prompt: the routine that worked for changing blocks live (offline, fingerprint,
         // smallest edit tool, compile one block, compare). Clients that only read tool lists
         // get the short form from the server instructions in Program.cs.
@@ -919,6 +939,7 @@ Follow this routine, one block at a time:
    - one LAD/FBD network: copy the network's <SW.Blocks.CompileUnit> from the export into its own file, edit it, then 'EditBlockNetwork' (action 'replace' or 'insert', networkFile) with previewFile first; check the preview, then run the same call without previewFile.
    - SCL statements as one network: 'EditBlockNetwork' with sclFile (plain SCL statements; '#name' refers to the block's own variables).
    - one DB start value: 'SetDbStartValue' with the member path from 'GetDbStartValues'.
+   - a new, changed or removed variable: 'EditBlockInterface' (add it before the network that uses it).
    - a whole new SCL block: 'ImportSourceBlock' from a .scl file.
    The edit tools back the block up first and return the backup path.
 5. Compile: 'CompileCodeBlock' for this block only.

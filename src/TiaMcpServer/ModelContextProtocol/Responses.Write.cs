@@ -42,6 +42,24 @@ namespace TiaMcpServer.ModelContextProtocol
         public string? PreviewFile { get; set; }
     }
 
+    public class ResponseInterfaceEdit : ResponseMessage
+    {
+        public string BlockPath { get; set; } = string.Empty;
+        public string Action { get; set; } = string.Empty;
+        public string Section { get; set; } = string.Empty;
+        public string MemberPath { get; set; } = string.Empty;
+
+        /// <summary>The member before the change, e.g. 'bDone : Bool := false // Done flag'; null for add.</summary>
+        public string? Before { get; set; }
+
+        /// <summary>The member after the change; null for delete.</summary>
+        public string? After { get; set; }
+
+        public string? Backup { get; set; }
+        public string? BackupWarning { get; set; }
+        public string? PreviewFile { get; set; }
+    }
+
     public class ResponseDeleted : ResponseMessage
     {
         public string? Kind { get; set; }

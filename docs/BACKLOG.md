@@ -5,7 +5,7 @@ request titled with its id (see "Contributing to this fork" in [AGENTS.md](../AG
 picks it up. Remove the item here in the same pull request that finishes it.
 
 Done so far: software checksum (A0), network-level block edit with LAD flow order and SCL text (A1), backup
-before delete or replacing import (A2), DB start values read/write (A3), V21 build switch (part of D12), HMI screen item dynamizations read/write (C6).
+before delete or replacing import (A2), DB start values read/write (A3), V21 build switch (part of D12), HMI screen item dynamizations read/write (C6), block interface member add/change/delete (`EditBlockInterface`).
 
 ## C. HMI (WinCC Unified), alarms, texts - current priority
 

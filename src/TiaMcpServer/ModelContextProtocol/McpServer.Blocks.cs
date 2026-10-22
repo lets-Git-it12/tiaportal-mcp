@@ -695,6 +695,75 @@ namespace TiaMcpServer.ModelContextProtocol
         }
 
         [WriteTool]
+        [McpServerTool(Name = "EditBlockInterface", Title = "Add, change or delete a block interface member", Destructive = true, Idempotent = false, OpenWorld = false, UseStructuredContent = true),
+         Description("Use to add, change or delete one variable in the interface of an FB, FC, OB or global DB (Input, Output, InOut, Static, Temp, Constant) instead of editing the whole block XML, e.g. a new Static Bool before writing a network that uses it. The block is exported, the one member changed, backed up and imported again. Instance DBs follow their FB: change the FB and compile it. Use 'previewFile' to only write the edited block XML. The block must be consistent (compile it first); compile it afterwards ('CompileCodeBlock')")]
+        public static ResponseInterfaceEdit EditBlockInterface(
+            [Description("softwarePath: the PLC software as 'GetProjectTree' names it, e.g. 'PLC_1'; a PLC inside a PC station or device group takes its parent path, e.g. 'PC-System_1/Software PLC_1'")] string softwarePath,
+            [Description("blockPath: root-relative path of the block, e.g. 009_Servo/FB_PitchHome_Inch")] string blockPath,
+            [Description("action: 'add', 'update' (change data type, start value or comment) or 'delete'")] string action,
+            [Description("section: Input, Output, InOut, Static, Temp or Constant (Return: an FC's return type, update only), e.g. 'Static'")] string section,
+            [Description("memberPath: the member inside the section, '.'-separated into Structs, e.g. 'bNew' or 'aux.bNew'; quote a name that contains dots, e.g. 'S.\"command.Busy\"'")] string memberPath,
+            [Description("dataType: required for add, optional for update, e.g. 'Bool', 'Int', 'Array[1..10] of Int', '\"UDT_Axis\"', 'Struct', 'TON_TIME'")] string dataType = "",
+            [Description("startValue: optional start value (constant value for Constant), e.g. 'false', '10', '1.5'")] string startValue = "",
+            [Description("comment: optional member comment, e.g. 'Homing done'")] string comment = "",
+            [Description("afterMember: add only, optional name of the member to insert after (same level), e.g. 'Result_Data_Quantity'; empty appends at the end")] string afterMember = "",
+            [Description("previewFile: optional absolute path; the edited block XML is written there and nothing is imported")] string previewFile = "")
+        {
+            WritePolicy.EnsureEnabled(nameof(EditBlockInterface));
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(previewFile))
+                {
+                    Operation.RequireAbsolutePath(previewFile, nameof(previewFile));
+                }
+
+                var result = Portal.EditBlockInterface(softwarePath, blockPath, action, section, memberPath, dataType, startValue, comment, afterMember, previewFile);
+                var verb = action.Trim().ToLowerInvariant() switch
+                {
+                    "add" => "added",
+                    "delete" => "deleted",
+                    _ => "updated"
+                };
+
+                var change = result.Before != null && result.After != null
+                    ? $"'{result.Before}' -> '{result.After}'"
+                    : $"'{result.After ?? result.Before}'";
+
+                var message = result.PreviewFile != null
+                    ? $"Preview: {result.Section} member {change} {verb} in '{result.BlockPath}', written to '{result.PreviewFile}'. Nothing was imported."
+                    : $"{result.Section} member {change} {verb} in '{result.BlockPath}'. Compile the block ('CompileCodeBlock'); callers of an FB/FC and code using a deleted member may need it too. {SaveHint}";
+
+                var backup = new Portal.BackupResult { Path = result.Backup, Warning = result.BackupWarning };
+
+                return new ResponseInterfaceEdit
+                {
+                    BlockPath = result.BlockPath,
+                    Action = verb,
+                    Section = result.Section,
+                    MemberPath = result.MemberPath,
+                    Before = result.Before,
+                    After = result.After,
+                    Backup = result.Backup,
+                    BackupWarning = result.BackupWarning,
+                    PreviewFile = result.PreviewFile,
+                    Message = message + BackupNote(backup),
+                    Meta = result.PreviewFile != null
+                        ? new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
+                        : OkMeta()
+                };
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error editing the interface of '{blockPath}': {ex.Message}", ex);
+            }
+        }
+
+        [WriteTool]
         [McpServerTool(Name = "DeleteBlock", Title = "Delete block", Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true),
          Description("Delete a program block. Its XML is saved first and returned as 'backup', for re-import with 'ImportXmlBlock'. Know-how protected blocks are rejected: remove the protection in TIA Portal first")]
         public static ResponseDeleted DeleteBlock(
