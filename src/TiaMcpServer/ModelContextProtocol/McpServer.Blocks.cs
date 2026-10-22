@@ -719,39 +719,7 @@ namespace TiaMcpServer.ModelContextProtocol
                 }
 
                 var result = Portal.EditBlockInterface(softwarePath, blockPath, action, section, memberPath, dataType, startValue, comment, afterMember, previewFile);
-                var verb = action.Trim().ToLowerInvariant() switch
-                {
-                    "add" => "added",
-                    "delete" => "deleted",
-                    _ => "updated"
-                };
-
-                var change = result.Before != null && result.After != null
-                    ? $"'{result.Before}' -> '{result.After}'"
-                    : $"'{result.After ?? result.Before}'";
-
-                var message = result.PreviewFile != null
-                    ? $"Preview: {result.Section} member {change} {verb} in '{result.BlockPath}', written to '{result.PreviewFile}'. Nothing was imported."
-                    : $"{result.Section} member {change} {verb} in '{result.BlockPath}'. Compile the block ('CompileCodeBlock'); callers of an FB/FC and code using a deleted member may need it too. {SaveHint}";
-
-                var backup = new Portal.BackupResult { Path = result.Backup, Warning = result.BackupWarning };
-
-                return new ResponseInterfaceEdit
-                {
-                    BlockPath = result.BlockPath,
-                    Action = verb,
-                    Section = result.Section,
-                    MemberPath = result.MemberPath,
-                    Before = result.Before,
-                    After = result.After,
-                    Backup = result.Backup,
-                    BackupWarning = result.BackupWarning,
-                    PreviewFile = result.PreviewFile,
-                    Message = message + BackupNote(backup),
-                    Meta = result.PreviewFile != null
-                        ? new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
-                        : OkMeta()
-                };
+                return InterfaceEdited(result, action, "block", "Compile the block ('CompileCodeBlock'); callers of an FB/FC and code using a deleted member may need it too.");
             }
             catch (PortalException pex)
             {
@@ -761,6 +729,81 @@ namespace TiaMcpServer.ModelContextProtocol
             {
                 throw new McpException($"Unexpected error editing the interface of '{blockPath}': {ex.Message}", ex);
             }
+        }
+
+        [WriteTool]
+        [McpServerTool(Name = "EditTypeInterface", Title = "Add, change or delete a UDT member", Destructive = true, Idempotent = false, OpenWorld = false, UseStructuredContent = true),
+         Description("Use to add, change or delete one member of a PLC data type (UDT) instead of editing the whole type XML, e.g. a new field in a settings struct. The type is exported, the one member changed, backed up and imported again. Blocks and DBs that use the type become inconsistent until compiled ('CompileSoftware'). Use 'previewFile' to only write the edited type XML")]
+        public static ResponseInterfaceEdit EditTypeInterface(
+            [Description("softwarePath: the PLC software as 'GetProjectTree' names it, e.g. 'PLC_1'; a PLC inside a PC station or device group takes its parent path, e.g. 'PC-System_1/Software PLC_1'")] string softwarePath,
+            [Description("typePath: root-relative path of the type in 'PLC data types', e.g. 'Servo/UDT_Origin'")] string typePath,
+            [Description("action: 'add', 'update' (change data type, start value or comment) or 'delete'")] string action,
+            [Description("memberPath: the member, '.'-separated into Structs, e.g. 'OriginOffset' or 'Speed.Creep'; quote a name that contains dots, e.g. '\"command.Busy\"'")] string memberPath,
+            [Description("dataType: required for add, optional for update, e.g. 'Real', 'Bool', 'Array[1..10] of Int', '\"UDT_Axis\"', 'Struct'")] string dataType = "",
+            [Description("startValue: optional default value, e.g. '2.0', 'false'")] string startValue = "",
+            [Description("comment: optional member comment, e.g. 'Offset after homing [mm]'")] string comment = "",
+            [Description("afterMember: add only, optional name of the member to insert after (same level), e.g. 'OriginOffset'; empty appends at the end")] string afterMember = "",
+            [Description("previewFile: optional absolute path; the edited type XML is written there and nothing is imported")] string previewFile = "")
+        {
+            WritePolicy.EnsureEnabled(nameof(EditTypeInterface));
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(previewFile))
+                {
+                    Operation.RequireAbsolutePath(previewFile, nameof(previewFile));
+                }
+
+                var result = Portal.EditTypeInterface(softwarePath, typePath, action, memberPath, dataType, startValue, comment, afterMember, previewFile);
+                return InterfaceEdited(result, action, "type", "Compile the PLC software ('CompileSoftware') so the blocks and DBs using the type are updated.");
+            }
+            catch (PortalException pex)
+            {
+                throw new McpException(pex.Message, pex);
+            }
+            catch (Exception ex) when (ex is not McpException)
+            {
+                throw new McpException($"Unexpected error editing type '{typePath}': {ex.Message}", ex);
+            }
+        }
+
+        private static ResponseInterfaceEdit InterfaceEdited(Portal.InterfaceEditResult result, string action, string what, string compileHint)
+        {
+            var verb = action.Trim().ToLowerInvariant() switch
+            {
+                "add" => "added",
+                "delete" => "deleted",
+                _ => "updated"
+            };
+
+            var change = result.Before != null && result.After != null
+                ? $"'{result.Before}' -> '{result.After}'"
+                : $"'{result.After ?? result.Before}'";
+
+            var section = result.Section == "None" ? "Member" : $"{result.Section} member";
+
+            var message = result.PreviewFile != null
+                ? $"Preview: {section} {change} {verb} in {what} '{result.BlockPath}', written to '{result.PreviewFile}'. Nothing was imported."
+                : $"{section} {change} {verb} in {what} '{result.BlockPath}'. {compileHint} {SaveHint}";
+
+            var backup = new Portal.BackupResult { Path = result.Backup, Warning = result.BackupWarning };
+
+            return new ResponseInterfaceEdit
+            {
+                BlockPath = result.BlockPath,
+                Action = verb,
+                Section = result.Section,
+                MemberPath = result.MemberPath,
+                Before = result.Before,
+                After = result.After,
+                Backup = result.Backup,
+                BackupWarning = result.BackupWarning,
+                PreviewFile = result.PreviewFile,
+                Message = message + BackupNote(backup),
+                Meta = result.PreviewFile != null
+                    ? new JsonObject { ["timestamp"] = DateTime.Now, ["success"] = true }
+                    : OkMeta()
+            };
         }
 
         [WriteTool]

@@ -923,6 +923,32 @@ Use the EditBlockInterface tool with these parameters:
 - memberPath: {memberPath}{OptionalParameter("dataType", dataType)}{OptionalParameter("startValue", startValue)}{OptionalParameter("comment", comment)}{OptionalParameter("afterMember", afterMember)}{OptionalParameter("previewFile", previewFile)}";
         }
 
+        [McpServerPrompt(Name = "EditTypeInterface"), Description("Add, change or delete one member of a PLC data type (UDT)")]
+        public static string EditTypeInterface(string softwarePath, string typePath, string action, string memberPath, string dataType = "", string startValue = "", string comment = "", string afterMember = "", string previewFile = "")
+        {
+            return $@"Change one member of a PLC data type (UDT) without editing the whole type XML. The type is backed up first. Compile the PLC software afterwards so the blocks using the type are updated.
+
+Common parameter values:
+- softwarePath: defines the path in the project structure to the software
+- typePath: root-relative path of the type in 'PLC data types'
+- action: 'add', 'update' or 'delete'
+- memberPath: '.'-separated into Structs, e.g. 'Speed.Creep'
+
+Use the EditTypeInterface tool with these parameters:
+- softwarePath: {softwarePath}
+- typePath: {typePath}
+- action: {action}
+- memberPath: {memberPath}{OptionalParameter("dataType", dataType)}{OptionalParameter("startValue", startValue)}{OptionalParameter("comment", comment)}{OptionalParameter("afterMember", afterMember)}{OptionalParameter("previewFile", previewFile)}";
+        }
+
+        [McpServerPrompt(Name = "GetChangeLog"), Description("List what this server changed in the project on a day")]
+        public static string GetChangeLog(string day = "", string toolRegex = "")
+        {
+            return $@"List the write tool calls this server made on one day (time, tool, arguments, ok or error, reply, backup file), e.g. to write a change summary.
+
+Use the GetChangeLog tool with these parameters:{OptionalParameter("day", day)}{OptionalParameter("toolRegex", toolRegex)}";
+        }
+
         // Not a tool prompt: the routine that worked for changing blocks live (offline, fingerprint,
         // smallest edit tool, compile one block, compare). Clients that only read tool lists
         // get the short form from the server instructions in Program.cs.
@@ -939,7 +965,7 @@ Follow this routine, one block at a time:
    - one LAD/FBD network: copy the network's <SW.Blocks.CompileUnit> from the export into its own file, edit it, then 'EditBlockNetwork' (action 'replace' or 'insert', networkFile) with previewFile first; check the preview, then run the same call without previewFile.
    - SCL statements as one network: 'EditBlockNetwork' with sclFile (plain SCL statements; '#name' refers to the block's own variables).
    - one DB start value: 'SetDbStartValue' with the member path from 'GetDbStartValues'.
-   - a new, changed or removed variable: 'EditBlockInterface' (add it before the network that uses it).
+   - a new, changed or removed variable: 'EditBlockInterface' (add it before the network that uses it); a UDT member: 'EditTypeInterface'.
    - a whole new SCL block: 'ImportSourceBlock' from a .scl file.
    The edit tools back the block up first and return the backup path.
 5. Compile: 'CompileCodeBlock' for this block only.

@@ -208,7 +208,7 @@ namespace TiaMcpServer.ModelContextProtocol
             }
         }
 
-        [McpServerTool(Name = "Doctor", Title = "Run Doctor diagnostics", ReadOnly = true, OpenWorld = true, UseStructuredContent = true), Description("Diagnose the TIA Portal environment: server version, connection, open project, active and installed TIA Portal versions, Openness user group membership. Also reports which git commit this running exe was actually built from and - unless checkRemote=false - whether the source tree has moved on since (needs rebuilding) or is behind origin/main on GitHub (needs a pull); a quick 'git ls-remote', no fetch/pull. Added after a rebuilt exe was confirmed to silently keep serving old code with no way to tell from outside it.")]
+        [McpServerTool(Name = "Doctor", Title = "Run Doctor diagnostics", ReadOnly = true, OpenWorld = true, UseStructuredContent = true), Description("Diagnose the TIA Portal environment: server version, connection, open project, active and installed TIA Portal versions, Openness user group membership. Also reports which git commit this running exe was actually built from and - unless checkRemote=false - whether the source tree has moved on since (needs rebuilding) or is behind its branch on GitHub (needs a pull); a quick 'git ls-remote', no fetch/pull. Added after a rebuilt exe was confirmed to silently keep serving old code with no way to tell from outside it.")]
         public static ResponseDoctor Doctor(
             [Description("checkRemote: also check origin/main on GitHub via 'git ls-remote' (default true). Set false to stay offline/local-only.")] bool checkRemote = true)
         {

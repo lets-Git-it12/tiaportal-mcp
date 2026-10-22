@@ -35,7 +35,7 @@ namespace TiaMcpServer.Siemens
             public string? Warning { get; set; }
         }
 
-        private static string ResolveBackupRoot() =>
+        internal static string ResolveBackupRoot() =>
             string.IsNullOrWhiteSpace(BackupRoot)
                 ? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "tiaportal-mcp-backups")
                 : BackupRoot!;

@@ -100,7 +100,7 @@ either, and gate themselves a different way:
 To enable write mode, add the argument to your client configuration, for example
 `"args": ["--allow-write"]`.
 
-Before `DeleteBlock`, `DeleteType`, `EditBlockNetwork`, `EditBlockInterface`, `SetDbStartValue`, and an `ImportXmlBlock`/`ImportXmlType` that replaces an
+Before `DeleteBlock`, `DeleteType`, `EditBlockNetwork`, `EditBlockInterface`, `EditTypeInterface`, `SetDbStartValue`, and an `ImportXmlBlock`/`ImportXmlType` that replaces an
 object of the same name, the current object is exported as XML to
 `<backup path>\<yyyyMMdd>\<time>_<tool>_<object>.xml` and the reply names the file (`backup`).
 Re-importing that file restores the old version even after the project was saved. An object TIA
@@ -109,13 +109,17 @@ WinCC Unified screens cannot be exported, so `SetHmiTagDynamization`, `SetHmiScr
 `SetHmiFlashingDynamization` and `DeleteHmiDynamization` save the dynamization they change as a
 `.json` file in the same folder instead (and return it as `previous`).
 
+Every write tool call is also logged as one JSON line in `<backup path>\audit\<yyyyMMdd>.jsonl` (time,
+tool, arguments, ok or error, reply, backup file). `GetChangeLog` lists a day's entries, e.g. to write
+a change summary.
+
 ## Tools
 
-171 tools total. Read-only/ungated tools (95) are always available.
+173 tools total. Read-only/ungated tools (96) are always available.
 
 | Area                          | Tools                                                                                                                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Portal and state              | `Connect`, `Disconnect`, `GetPortals`, `GetState`, `Doctor`                                                                                                                                            |
+| Portal and state              | `Connect`, `Disconnect`, `GetPortals`, `GetState`, `Doctor`, `GetChangeLog`                                                                                                                                          |
 | Project and session           | `GetProject`, `OpenProject`, `SaveProject`, `SaveAsProject`, `ArchiveProject`, `CloseProject`                                                                                                                            |
 | Devices                       | `GetProjectTree`, `GetDevices`, `GetDeviceInfo`, `GetDeviceItemInfo`, `GetGsdDependencies`, `GetDeviceMasterCopies`, `FindHardwareCatalogEntries`                                                     |
 | Network topology              | `GetSubnets`, `GetNetworkInterfaceInfo`                                                                                                                                                               |
@@ -136,13 +140,13 @@ WinCC Unified screens cannot be exported, so `SetHmiTagDynamization`, `SetHmiScr
 | HMI, WinCC Unified (read)     | `GetHmiTagTables`, `GetHmiTags`, `GetHmiScreens`, `GetHmiScreenItems`, `GetHmiDynamizations`, `GetHmiDiscreteAlarms`, `GetHmiAnalogAlarms`, `GetHmiTextLists`, `CompareHmiScreens`                                          |
 | Understand and read (comfort) | `GetPlcSummary`, `ResolveObjectPath`, `WhereUsed`, `FindInCode`, `GetBlockSource`, `GetNetworkSource`, `GetTypeSource`, `PreviewImport`, `OpenTiaProject`, `ExportPlcAsDocuments`, `CompareExports`, `SearchExports`    |
 
-Write tools (76) require `--allow-write` (see [Write mode](#write-mode) for the handful that
+Write tools (77) require `--allow-write` (see [Write mode](#write-mode) for the handful that
 don't, and why).
 
 | Area                       | Tools                                                                                                                                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Block and type groups      | `CreateBlockGroup`, `DeleteBlockGroup`, `CreateTypeGroup`, `DeleteTypeGroup`                                                                                                                    |
-| Blocks and types           | `EditBlockNetwork`, `EditBlockInterface`, `SetDbStartValue`, `DeleteBlock`, `RenameBlock`, `DeleteType`, `RenameType`, `CreateFB`, `CreateInstanceDB`                                                                                                        |
+| Blocks and types           | `EditBlockNetwork`, `EditBlockInterface`, `EditTypeInterface`, `SetDbStartValue`, `DeleteBlock`, `RenameBlock`, `DeleteType`, `RenameType`, `CreateFB`, `CreateInstanceDB`                                                                                                        |
 | Copy and move              | `CopyBlock`, `MoveBlock`, `CopyType`, `MoveType`                                                                                                                                                |
 | Tag tables                 | `CreateTagTable`, `DeleteTagTable`, `RenameTagTable`, `CreateTagTableGroup`, `DeleteTagTableGroup`, `ImportXmlTagTable`                                                                         |
 | Technology objects         | `SetTechnologyObjectParameter`                                                                                                                                                                   |
@@ -331,7 +335,7 @@ These are not gaps in this server - the underlying API offers no operation for t
   SCL/DB/STL source that TIA Portal compiles into blocks (`ImportSourceBlock`), or documents
   (`ImportFromDocuments`, V20+). To change an existing block there is no need to rebuild its
   XML by hand: `EditBlockNetwork` replaces, inserts or deletes one network (from XML or SCL
-  text), `EditBlockInterface` adds, changes or deletes one interface member, and `SetDbStartValue`
+  text), `EditBlockInterface` adds, changes or deletes one interface member (`EditTypeInterface` one UDT member), and `SetDbStartValue`
   changes one DB start value.
 - __Read-only objects.__ System constants cannot be created or changed, the force table cannot
   be created or deleted (the system owns one per PLC), the default tag table cannot be deleted,
@@ -382,8 +386,8 @@ These are not gaps in this server - the underlying API offers no operation for t
 - Built on the [ModelContextProtocol](https://www.nuget.org/packages/ModelContextProtocol) .NET SDK **2.2.0**.
 - Protocol revisions negotiated during `initialize`: `2024-11-05`, `2025-03-26`, `2025-06-18`, `2025-11-25` (the SDK picks the highest the client also supports).
 - Every tool advertises a human-readable `title` and behaviour annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`).
-- 151 of the 171 tools publish an `outputSchema` and return `structuredContent` (80 of 95
-  read-only, 71 of 76 write).
+- 153 of the 173 tools publish an `outputSchema` and return `structuredContent` (81 of 96
+  read-only, 72 of 77 write).
 - Long-running export/import tools report progress via `notifications/progress` when the client supplies a `progressToken`.
 - Independently of that, `GetState` can report the progress of another call still running on the
   same TIA Portal instance (tool name, processed/total, current object, time since last progress)

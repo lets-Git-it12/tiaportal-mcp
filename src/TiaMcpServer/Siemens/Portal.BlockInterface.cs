@@ -1,5 +1,6 @@
 using Siemens.Engineering;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Types;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -21,6 +22,7 @@ namespace TiaMcpServer.Siemens
         //   quotes: 'S."command.Busy"'.
         // - Instance DBs take their interface from the FB and are refused; change the FB and
         //   compile it, TIA then updates the instances. UDTs are types, not blocks.
+        // - EditTypeInterface does the same for a UDT (one section, 'None' in the XML).
         // - Callers of a changed FB/FC and code that used a deleted member become inconsistent;
         //   the tool says to compile ('CompileCodeBlock').
 
@@ -116,73 +118,7 @@ namespace TiaMcpServer.Siemens
                     block.Export(new FileInfo(exportFile), ExportOptions.None);
 
                     var doc = XDocument.Load(exportFile);
-                    var sectionElement = doc.Descendants()
-                        .Where(e => e.Name.LocalName == "Section" && (string?)e.Attribute("Name") == sectionName)
-                        .FirstOrDefault(e => e.Parent?.Parent?.Name.LocalName == "Interface")
-                        ?? throw new PortalException(PortalErrorCode.InvalidParams,
-                            $"Block '{block.Name}' has no '{sectionName}' section (e.g. an FC has no Static, a global DB only Static).");
-
-                    var ns = sectionElement.Name.Namespace;
-                    var parent = ResolveMemberParent(sectionElement, path, memberPath);
-                    var name = path[path.Count - 1];
-                    var existing = MemberChildren(parent).FirstOrDefault(m => (string?)m.Attribute("Name") == name);
-
-                    switch (mode)
-                    {
-                        case "add":
-                            if (existing != null)
-                            {
-                                throw new PortalException(PortalErrorCode.InvalidParams,
-                                    $"'{memberPath}' already exists in {sectionName} ({existing.Attribute("Datatype")?.Value}). Use action 'update' to change it.");
-                            }
-
-                            var member = new XElement(ns + "Member", new XAttribute("Name", name), new XAttribute("Datatype", dataType.Trim()));
-                            SetMemberComment(member, comment, CommentLanguage(doc));
-                            SetMemberStartValue(member, startValue);
-
-                            if (string.IsNullOrWhiteSpace(afterMember))
-                            {
-                                var last = MemberChildren(parent).LastOrDefault();
-                                if (last != null) last.AddAfterSelf(member);
-                                else InsertFirstMember(parent, member);
-                            }
-                            else
-                            {
-                                var anchor = MemberChildren(parent).FirstOrDefault(m => (string?)m.Attribute("Name") == afterMember.Trim().Trim('"'))
-                                    ?? throw new PortalException(PortalErrorCode.InvalidParams,
-                                        $"afterMember '{afterMember}' is not a member next to '{name}'. Members there: {string.Join(", ", MemberChildren(parent).Select(m => (string?)m.Attribute("Name")))}.");
-                                anchor.AddAfterSelf(member);
-                            }
-
-                            result.After = DescribeMember(member);
-                            break;
-
-                        case "update":
-                            if (existing == null) throw MemberNotFound(parent, memberPath, sectionName);
-                            result.Before = DescribeMember(existing);
-
-                            if (!string.IsNullOrWhiteSpace(dataType))
-                            {
-                                if (MemberChildren(existing).Any() && !string.Equals(dataType.Trim(), "Struct", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    throw new PortalException(PortalErrorCode.InvalidParams,
-                                        $"'{memberPath}' is a Struct with members; delete it and add it again to change its type.");
-                                }
-
-                                existing.SetAttributeValue("Datatype", dataType.Trim());
-                            }
-
-                            SetMemberComment(existing, comment, CommentLanguage(doc));
-                            SetMemberStartValue(existing, startValue);
-                            result.After = DescribeMember(existing);
-                            break;
-
-                        default:
-                            if (existing == null) throw MemberNotFound(parent, memberPath, sectionName);
-                            result.Before = DescribeMember(existing);
-                            existing.Remove();
-                            break;
-                    }
+                    (result.Before, result.After) = EditInterfaceMember(doc, $"Block '{block.Name}'", mode, sectionName, path, memberPath, dataType, startValue, comment, afterMember);
 
                     if (!string.IsNullOrWhiteSpace(previewFile))
                     {
@@ -210,6 +146,171 @@ namespace TiaMcpServer.Siemens
                     return result;
                 },
                 ("softwarePath", softwarePath), ("blockPath", blockPath), ("action", action), ("section", section), ("memberPath", memberPath));
+        }
+
+        /// <summary>
+        /// The same member edit for a PLC data type (UDT): its members live in one section,
+        /// so there is no section argument. Blocks that use the type become inconsistent until
+        /// they are compiled.
+        /// </summary>
+        public InterfaceEditResult EditTypeInterface(string softwarePath, string typePath, string action, string memberPath,
+            string dataType = "", string startValue = "", string comment = "", string afterMember = "", string previewFile = "")
+        {
+            return Operation.Run(_logger, nameof(EditTypeInterface), PortalErrorCode.ImportFailed,
+                () =>
+                {
+                    var mode = (action ?? string.Empty).Trim().ToLowerInvariant();
+                    if (mode != "add" && mode != "update" && mode != "delete")
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, $"Unknown action '{action}'. Use 'add', 'update' or 'delete'.");
+                    }
+
+                    var path = SplitMemberPath(memberPath);
+                    if (mode == "add" && string.IsNullOrWhiteSpace(dataType))
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, "'dataType' is required to add a member, e.g. 'Bool' or 'Array[1..10] of Int'.");
+                    }
+
+                    if (mode == "update" && string.IsNullOrWhiteSpace(dataType) && string.IsNullOrEmpty(startValue) && string.IsNullOrEmpty(comment))
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams, "Nothing to update: give 'dataType', 'startValue' or 'comment'.");
+                    }
+
+                    var type = GetType(softwarePath, typePath)
+                        ?? throw new PortalException(PortalErrorCode.NotFound,
+                            $"Type not found at '{typePath}'. Use 'GetTypes' to find its path.");
+
+                    if (!type.IsConsistent)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidState,
+                            $"Type '{type.Name}' is inconsistent; TIA Portal does not export inconsistent types. Compile the PLC software first.");
+                    }
+
+                    if (type.Parent is not PlcTypeGroup parentGroup)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidState, $"Type '{type.Name}' has no type group to import into.");
+                    }
+
+                    EnsureNotKnowHowProtected(type);
+
+                    var result = new InterfaceEditResult { BlockPath = GetTypePath(type), Section = "None", MemberPath = memberPath.Trim() };
+
+                    using var scope = new SourceScope(_logger);
+                    var exportFile = Path.Combine(scope.Directory, $"{FileNames.Safe(type.Name)}.xml");
+                    type.Export(new FileInfo(exportFile), ExportOptions.None);
+
+                    var doc = XDocument.Load(exportFile);
+                    (result.Before, result.After) = EditInterfaceMember(doc, $"Type '{type.Name}'", mode, "None", path, memberPath, dataType, startValue, comment, afterMember);
+
+                    if (!string.IsNullOrWhiteSpace(previewFile))
+                    {
+                        var directory = Path.GetDirectoryName(previewFile);
+                        if (!string.IsNullOrEmpty(directory))
+                        {
+                            Directory.CreateDirectory(directory);
+                        }
+
+                        doc.Save(previewFile);
+                        result.PreviewFile = previewFile;
+                        return result;
+                    }
+
+                    var editedFile = Path.Combine(scope.Directory, "edited", $"{FileNames.Safe(type.Name)}.xml");
+                    Directory.CreateDirectory(Path.GetDirectoryName(editedFile)!);
+                    doc.Save(editedFile);
+
+                    var backup = BackupType(softwarePath, typePath, nameof(EditTypeInterface));
+                    result.Backup = backup.Path;
+                    result.BackupWarning = backup.Warning;
+
+                    ImportXmlType(softwarePath, GetPlcTypeGroupPath(parentGroup, includeSystemRoot: false), editedFile);
+
+                    return result;
+                },
+                ("softwarePath", softwarePath), ("typePath", typePath), ("action", action), ("memberPath", memberPath));
+        }
+
+        /// <summary>
+        /// Adds, updates or deletes one member in an exported block or type document. Returns the
+        /// member as text before and after the change. Shared by EditBlockInterface and
+        /// EditTypeInterface.
+        /// </summary>
+        private static (string? Before, string? After) EditInterfaceMember(XDocument doc, string owner, string mode, string sectionName,
+            List<string> path, string memberPath, string dataType, string startValue, string comment, string afterMember)
+        {
+            string? before = null;
+            string? after = null;
+
+            var sectionElement = doc.Descendants()
+                .Where(e => e.Name.LocalName == "Section" && (string?)e.Attribute("Name") == sectionName)
+                .FirstOrDefault(e => e.Parent?.Parent?.Name.LocalName == "Interface")
+                ?? throw new PortalException(PortalErrorCode.InvalidParams,
+                    $"{owner} has no '{sectionName}' section (e.g. an FC has no Static, a global DB only Static).");
+
+            var ns = sectionElement.Name.Namespace;
+            var parent = ResolveMemberParent(sectionElement, path, memberPath);
+            var name = path[path.Count - 1];
+            var existing = MemberChildren(parent).FirstOrDefault(m => (string?)m.Attribute("Name") == name);
+
+            switch (mode)
+            {
+                case "add":
+                    if (existing != null)
+                    {
+                        throw new PortalException(PortalErrorCode.InvalidParams,
+                            $"'{memberPath}' already exists in {sectionName} ({existing.Attribute("Datatype")?.Value}). Use action 'update' to change it.");
+                    }
+
+                    var member = new XElement(ns + "Member", new XAttribute("Name", name), new XAttribute("Datatype", dataType.Trim()));
+                    SetMemberComment(member, comment, CommentLanguage(doc));
+                    SetMemberStartValue(member, startValue);
+
+                    if (string.IsNullOrWhiteSpace(afterMember))
+                    {
+                        var last = MemberChildren(parent).LastOrDefault();
+                        if (last != null) last.AddAfterSelf(member);
+                        else InsertFirstMember(parent, member);
+                    }
+                    else
+                    {
+                        var anchor = MemberChildren(parent).FirstOrDefault(m => (string?)m.Attribute("Name") == afterMember.Trim().Trim('"'))
+                            ?? throw new PortalException(PortalErrorCode.InvalidParams,
+                                $"afterMember '{afterMember}' is not a member next to '{name}'. Members there: {string.Join(", ", MemberChildren(parent).Select(m => (string?)m.Attribute("Name")))}.");
+                        anchor.AddAfterSelf(member);
+                    }
+
+                    after = DescribeMember(member);
+                    break;
+
+                case "update":
+                    if (existing == null) throw MemberNotFound(parent, memberPath, sectionName);
+                    before = DescribeMember(existing);
+
+                    if (!string.IsNullOrWhiteSpace(dataType))
+                    {
+                        if (MemberChildren(existing).Any() && !string.Equals(dataType.Trim(), "Struct", StringComparison.OrdinalIgnoreCase))
+                        {
+                            throw new PortalException(PortalErrorCode.InvalidParams,
+                                $"'{memberPath}' is a Struct with members; delete it and add it again to change its type.");
+                        }
+
+                        existing.SetAttributeValue("Datatype", dataType.Trim());
+                    }
+
+                    SetMemberComment(existing, comment, CommentLanguage(doc));
+                    SetMemberStartValue(existing, startValue);
+                    after = DescribeMember(existing);
+                    break;
+
+                default:
+                    if (existing == null) throw MemberNotFound(parent, memberPath, sectionName);
+                    before = DescribeMember(existing);
+                    existing.Remove();
+                    break;
+            }
+
+
+            return (before, after);
         }
 
         /// <summary>'aux.bNew' -> [aux, bNew]; '"command.Busy"' stays one name.</summary>

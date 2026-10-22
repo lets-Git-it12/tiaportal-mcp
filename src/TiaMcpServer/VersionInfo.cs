@@ -68,7 +68,9 @@ namespace TiaMcpServer
             {
                 try
                 {
-                    var lsRemote = RunGit(repoRoot, "ls-remote origin refs/heads/main", timeoutMs: 10000);
+                    // The branch this exe was built from (this fork works on 'rebase/upstream-base', not 'main').
+                    var branch = string.IsNullOrEmpty(result.BuiltBranch) || result.BuiltBranch == "unknown" || result.BuiltBranch == "HEAD" ? "main" : result.BuiltBranch;
+                    var lsRemote = RunGit(repoRoot, $"ls-remote origin refs/heads/{branch}", timeoutMs: 10000);
                     if (!string.IsNullOrWhiteSpace(lsRemote))
                     {
                         var remoteCommit = lsRemote.Split(new[] { '\t', ' ' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();

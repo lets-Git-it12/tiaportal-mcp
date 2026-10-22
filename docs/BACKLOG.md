@@ -5,7 +5,7 @@ request titled with its id (see "Contributing to this fork" in [AGENTS.md](../AG
 picks it up. Remove the item here in the same pull request that finishes it.
 
 Done so far: software checksum (A0), network-level block edit with LAD flow order and SCL text (A1), backup
-before delete or replacing import (A2), DB start values read/write (A3), V21 build switch (part of D12), HMI screen item dynamizations read/write (C6), block interface member add/change/delete (`EditBlockInterface`).
+before delete or replacing import (A2), DB start values read/write (A3), V21 build switch (part of D12), HMI screen item dynamizations read/write (C6), block and UDT member add/change/delete (`EditBlockInterface`, `EditTypeInterface`), change log of write calls (B4, `GetChangeLog`).
 
 ## C. HMI (WinCC Unified), alarms, texts - current priority
 
@@ -40,7 +40,6 @@ before delete or replacing import (A2), DB start values read/write (A3), V21 bui
 | B1 | Download (software, changes only) | Behind its own `--allow-download` flag and a confirmation per call. Show the pre-download check first (does the CPU need STOP?). Openness `DownloadProvider`, `DownloadConfiguration`. |
 | B2 | Snapshot online values as start values | Openness upload. |
 | B3 | CPU RUN/STOP | Openness has no standalone command; only `StopModules`/`StartModules` inside a download, so it belongs to B1. |
-| B4 | Audit log (JSONL) of every write tool call | Lets a change log be written from what the server actually did. |
 | B5 | Hardware compare (project vs. another PLC or online) | Read-only. `IHardwareCompareTarget`, `CompareTo`. |
 
 ## D. Libraries, motion, other

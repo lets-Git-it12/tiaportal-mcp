@@ -60,6 +60,15 @@ namespace TiaMcpServer.ModelContextProtocol
         public string? PreviewFile { get; set; }
     }
 
+    public class ResponseChangeLog : ResponseMessage
+    {
+        /// <summary>The day's log file (JSON lines).</summary>
+        public string? File { get; set; }
+
+        /// <summary>One entry per write tool call: time, tool, outcome, arguments, message, backup.</summary>
+        public System.Collections.Generic.List<System.Text.Json.Nodes.JsonObject>? Entries { get; set; }
+    }
+
     public class ResponseDeleted : ResponseMessage
     {
         public string? Kind { get; set; }
